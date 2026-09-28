@@ -28,6 +28,10 @@ class FakeTokenService extends TokenService {
     this.signed.push(payload);
     return Promise.resolve('token');
   }
+
+  verify(): Promise<Parameters<TokenService['sign']>[0]> {
+    return Promise.reject(new Error('not used'));
+  }
 }
 
 describe('LoginUseCase', () => {

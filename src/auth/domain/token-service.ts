@@ -1,9 +1,6 @@
-import { Role } from './role';
+import { JwtPayload } from './jwt-payload';
 
 export abstract class TokenService {
-  abstract sign(payload: {
-    sub: string;
-    role: Role;
-    rut?: string;
-  }): Promise<string>;
+  abstract sign(payload: JwtPayload): Promise<string>;
+  abstract verify(token: string): Promise<JwtPayload>;
 }
