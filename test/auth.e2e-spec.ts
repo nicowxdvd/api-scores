@@ -1,4 +1,5 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
@@ -6,6 +7,12 @@ import { AppModule } from './../src/app.module';
 
 describe('POST /login (e2e)', () => {
   let app: INestApplication<App>;
+  let jwt: JwtService;
+
+  beforeAll(() => {
+    process.env.JWT_SECRET = 'test-secret';
+    process.env.JWT_EXPIRES_IN = '1h';
+  });
 
   beforeEach(async () => {
     const moduleFixture = await Test.createTestingModule({
@@ -17,6 +24,7 @@ describe('POST /login (e2e)', () => {
       new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
     );
     await app.init();
+    jwt = app.get(JwtService, { strict: false });
   });
 
   afterEach(async () => {
@@ -26,16 +34,33 @@ describe('POST /login (e2e)', () => {
   const login = (body: object) =>
     request(app.getHttpServer()).post('/login').send(body);
 
-  it('returns 200 for admin', () => {
-    return login({ email: 'admin@pp-scores.cl', password: '@dmin' }).expect(
-      200,
+  it('returns token without rut for admin', async () => {
+    const res = await login({
+      email: 'admin@pp-scores.cl',
+      password: '@dmin',
+    }).expect(200);
+
+    const payload = await jwt.verifyAsync<Record<string, unknown>>(
+      (res.body as { accessToken: string }).accessToken,
     );
+    expect(payload).toMatchObject({ sub: '001', role: 'admin' });
+    expect(payload).not.toHaveProperty('rut');
   });
 
-  it('returns 200 for user', () => {
-    return login({ email: 'user@pp-scores.cl', password: '123456' }).expect(
-      200,
+  it('returns token with rut for user', async () => {
+    const res = await login({
+      email: 'user@pp-scores.cl',
+      password: '123456',
+    }).expect(200);
+
+    const payload = await jwt.verifyAsync<Record<string, unknown>>(
+      (res.body as { accessToken: string }).accessToken,
     );
+    expect(payload).toMatchObject({
+      sub: '002',
+      role: 'user',
+      rut: '11.111.111-1',
+    });
   });
 
   it('returns 401 on wrong password', async () => {
