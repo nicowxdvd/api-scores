@@ -9,6 +9,7 @@ import { BcryptPasswordHasher } from './infrastructure/bcrypt-password-hasher';
 import { InMemoryUserRepository } from './infrastructure/in-memory-user.repository';
 import { JwtTokenService } from './infrastructure/jwt-token.service';
 import { AuthController } from './presentation/auth.controller';
+import { JwtAuthMiddleware } from './presentation/jwt-auth.middleware';
 
 @Module({
   imports: [
@@ -25,10 +26,12 @@ import { AuthController } from './presentation/auth.controller';
     }),
   ],
   controllers: [AuthController],
+  exports: [TokenService, JwtAuthMiddleware],
   providers: [
     { provide: UserRepository, useClass: InMemoryUserRepository },
     { provide: PasswordHasher, useClass: BcryptPasswordHasher },
     { provide: TokenService, useClass: JwtTokenService },
+    JwtAuthMiddleware,
     {
       provide: LoginUseCase,
       inject: [UserRepository, PasswordHasher, TokenService],
