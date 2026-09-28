@@ -31,9 +31,12 @@ import { AuthController } from './presentation/auth.controller';
     { provide: TokenService, useClass: JwtTokenService },
     {
       provide: LoginUseCase,
-      inject: [UserRepository, PasswordHasher],
-      useFactory: (users: UserRepository, hasher: PasswordHasher) =>
-        new LoginUseCase(users, hasher),
+      inject: [UserRepository, PasswordHasher, TokenService],
+      useFactory: (
+        users: UserRepository,
+        hasher: PasswordHasher,
+        tokens: TokenService,
+      ) => new LoginUseCase(users, hasher, tokens),
     },
   ],
 })

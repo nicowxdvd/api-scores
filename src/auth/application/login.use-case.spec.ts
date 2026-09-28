@@ -1,5 +1,6 @@
 import { InvalidCredentialsError } from '../domain/invalid-credentials.error';
 import { PasswordHasher } from '../domain/password-hasher';
+import { TokenService } from '../domain/token-service';
 import { User } from '../domain/user';
 import { UserRepository } from '../domain/user.repository';
 import { LoginUseCase } from './login.use-case';
@@ -20,10 +21,21 @@ class FakePasswordHasher extends PasswordHasher {
   }
 }
 
+class FakeTokenService extends TokenService {
+  signed: Parameters<TokenService['sign']>[0][] = [];
+
+  sign(payload: Parameters<TokenService['sign']>[0]): Promise<string> {
+    this.signed.push(payload);
+    return Promise.resolve('token');
+  }
+}
+
 describe('LoginUseCase', () => {
+  let tokens: FakeTokenService;
   let useCase: LoginUseCase;
 
   beforeEach(() => {
+    tokens = new FakeTokenService();
     useCase = new LoginUseCase(
       new FakeUserRepository([
         new User('001', 'admin@pp-scores.cl', 'hash:@dmin', 'admin'),
@@ -36,24 +48,42 @@ describe('LoginUseCase', () => {
         ),
       ]),
       new FakePasswordHasher(),
+      tokens,
     );
   });
 
-  it('resolves with valid credentials', async () => {
-    await expect(
-      useCase.execute({ email: 'admin@pp-scores.cl', password: '@dmin' }),
-    ).resolves.toBeUndefined();
+  it('returns token without rut when user has none', async () => {
+    const result = await useCase.execute({
+      email: 'admin@pp-scores.cl',
+      password: '@dmin',
+    });
+
+    expect(result).toEqual({ accessToken: 'token' });
+    expect(tokens.signed[0]).toEqual({ sub: '001', role: 'admin' });
+    expect(tokens.signed[0]).not.toHaveProperty('rut');
+  });
+
+  it('returns token with rut when user has one', async () => {
+    await useCase.execute({ email: 'user@pp-scores.cl', password: '123456' });
+
+    expect(tokens.signed[0]).toEqual({
+      sub: '002',
+      role: 'user',
+      rut: '11.111.111-1',
+    });
   });
 
   it('rejects unknown email', async () => {
     await expect(
       useCase.execute({ email: 'nadie@pp-scores.cl', password: '@dmin' }),
     ).rejects.toBeInstanceOf(InvalidCredentialsError);
+    expect(tokens.signed).toHaveLength(0);
   });
 
   it('rejects wrong password', async () => {
     await expect(
       useCase.execute({ email: 'user@pp-scores.cl', password: 'mala' }),
     ).rejects.toBeInstanceOf(InvalidCredentialsError);
+    expect(tokens.signed).toHaveLength(0);
   });
 });
